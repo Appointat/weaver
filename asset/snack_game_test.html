@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Snake Game</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #282c34;
+            color: #abb2bf;
+        }
+
+        h1 {
+            color: #61afef;
+            margin-bottom: 10px;
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 2px solid #61afef;
+            padding: 20px;
+            background-color: #21252b;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        canvas {
+            border: 1px solid #4b5263;
+            background-color: #2c313a;
+            border-radius: 4px;
+        }
+
+        .controls,
+        .info {
+            margin-top: 15px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .info span {
+            font-size: 1.1em;
+            margin: 0 10px;
+            padding: 5px 10px;
+            background-color: #3a3f4b;
+            border-radius: 4px;
+        }
+
+        button,
+        select {
+            padding: 10px 15px;
+            font-size: 1em;
+            background-color: #61afef;
+            color: #21252b;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover,
+        select:hover {
+            background-color: #528bce;
+        }
+
+        button:disabled {
+            background-color: #4b5263;
+            cursor: not-allowed;
+        }
+
+        .messages {
+            margin-top: 10px;
+            font-size: 1.2em;
+            color: #e5c07b;
+            min-height: 1.5em;
+            /* Reserve space for messages */
+        }
+
+        .ai-path-visualization {
+            position: absolute;
+            /* To overlay on canvas if needed, or handle within canvas draw */
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Advanced Snake Game</h1>
+    <div class="game-container">
+        <canvas id="gameCanvas"></canvas>
+        <div class="info">
+            <span>Score: <span id="score">0</span></span>
+            <span>Length: <span id="length">1</span></span>
+        </div>
+        <div class="controls">
+            <button id="startButton">Start Game</button>
+            <button id="pauseButton" disabled>Pause</button>
+            <button id="resetButton" disabled>Reset</button>
+            <label for="difficultySelect">Difficulty:</label>
+            <select id="difficultySelect">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+            </select>
+            <label for="aiToggle">AI Player:</label>
+            <input type="checkbox" id="aiToggle">
+            <button id="watchAiButton">Watch AI</button>
+        </div>
+        <div class="messages" id="gameMessages">Press Start to Play!</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const scoreDisplay = document.getElementById('score');
+        const lengthDisplay = document.getElementById('length');
+        const startButton = document.getElementById('startButton');
+        const pauseButton = document.getElementById('pauseButton');
+        const resetButton = document.getElementById('resetButton');
+        const difficultySelect = document.getElementById('difficultySelect');
+        const aiToggle = document.getElementById('aiToggle');
+        const watchAiButton = document.getElementById('watchAiButton');
+        const gameMessages = document.getElementById('gameMessages');
+
+        const GRID_SIZE = 20; // Number of cells in width/height
+        const CELL_SIZE = canvas.width / GRID_SIZE; // Calculate cell size based on canvas size
+
+        // Initial canvas setup - will be set properly in initGame
+        canvas.width = 400;
+        canvas.height = 400;
+        // Recalculate CELL_SIZE after setting canvas dimensions
+        let currentCellSize = canvas.width / GRID_SIZE;
+
+
+        let snake, food, specialItems, obstacles;
+        let score, snakeLength;
+        let dx, dy; // Snake direction
+        let gameLoopTimeout;
+        let gameSpeed;
+        let paused = false;
+        let gameOver = true;
+        let aiEnabled = false;
+        let aiPath = []; // For visualizing AI path
+
+        const FoodType = {
+            NORMAL: 'normal',
+            BONUS: 'bonus', // High score food
+            SLOWDOWN: 'slowdown', // Slows snake
+            SHIELD: 'shield' // Temporary invincibility (conceptual, harder to implement fully)
+        };
+
+        let shieldActive = false;
+        let shieldTimer = 0;
+
+        const DIFFICULTIES = {
+            easy: 150,
+            medium: 100,
+            hard: 60
+        };
+
+        function initGame() {
+            currentCellSize = canvas.width / GRID_SIZE; // Ensure cell size is correct
+            snake = [{ x: Math.floor(GRID_SIZE / 2), y: Math.floor(GRID_SIZE / 2) }];
+            dx = 1; dy = 0; // Initial direction: right
+            score = 0;
+            snakeLength = 1;
+            paused = false;
+            gameOver = false;
+            shieldActive = false;
+            shieldTimer = 0;
+            aiPath = [];
+
+            updateScoreAndLength();
+            spawnFood();
+            spawnSpecialItem(); // Spawn one special item at start
+            generateObstacles(3); // Generate 3 obstacles
+
+            gameSpeed = DIFFICULTIES[difficultySelect.value];
+
+            startButton.disabled = true;
+            pauseButton.disabled = false;
+            resetButton.disabled = false;
+            difficultySelect.disabled = true;
+            aiToggle.disabled = true; // Disable AI toggle during game
+            watchAiButton.disabled = true;
+
+            gameMessages.textContent = aiEnabled ? "AI is playing..." : "Game Started!";
+
+            if (gameLoopTimeout) clearTimeout(gameLoopTimeout);
+            gameLoop();
+        }
+
+        function gameLoop() {
+            if (gameOver || paused) {
+                return;
+            }
+
+            if (aiEnabled) {
+                makeAiMove();
+            }
+
+            updateGame();
+            drawGame();
+
+            gameLoopTimeout = setTimeout(gameLoop, gameSpeed);
+        }
+
+        function updateGame() {
+            if (shieldTimer > 0) {
+                shieldTimer -= gameSpeed;
+                if (shieldTimer <= 0) {
+                    shieldActive = false;
+                    gameMessages.textContent = "Shield wore off!";
+                }
+            }
+
+            const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+            snake.unshift(head);
+
+            // Check food consumption
+            if (head.x === food.x && head.y === food.y) {
+                score += food.points;
+                snakeLength++;
+                spawnFood();
+                // Chance to spawn a special item after eating normal food
+                if (Math.random() < 0.3 && specialItems.length < 2) spawnSpecialItem();
+            } else {
+                snake.pop(); // Remove tail if no food eaten
+            }
+
+            // Check special item consumption
+            specialItems.forEach((item, index) => {
+                if (head.x === item.x && head.y === item.y) {
+                    score += item.points;
+                    applySpecialItemEffect(item.type);
+                    specialItems.splice(index, 1); // Remove consumed item
+                    if (Math.random() < 0.5) spawnSpecialItem(); // Spawn another one
+                }
+            });
+
+
+            updateScoreAndLength();
+
+            // Check collisions
+            if (!shieldActive && checkCollision(head)) {
+                endGame();
+                return;
+            }
+        }
+
+        function applySpecialItemEffect(type) {
+            gameMessages.textContent = `Collected ${type}!`;
+            switch (type) {
+                case FoodType.BONUS:
+                    // Score already added
+                    break;
+                case FoodType.SLOWDOWN:
+                    gameSpeed = Math.min(200, gameSpeed + 50); // Slow down, but not too much
+                    setTimeout(() => { // Effect wears off
+                        gameSpeed = DIFFICULTIES[difficultySelect.value];
+                        if (!gameOver && !paused) gameMessages.textContent = "Slowdown wore off.";
+                    }, 5000);
+                    break;
+                case FoodType.SHIELD:
+                    shieldActive = true;
+                    shieldTimer = 5000; // 5 seconds of shield
+                    break;
+            }
+        }
+
+        function checkCollision(head) {
+            // Wall collision
+            if (head.x < 0 || head.x >= GRID_SIZE || head.y < 0 || head.y >= GRID_SIZE) {
+                return true;
+            }
+            // Self collision
+            for (let i = 1; i < snake.length; i++) {
+                if (head.x === snake[i].x && head.y === snake[i].y) {
+                    return true;
+                }
+            }
+            // Obstacle collision
+            for (const obs of obstacles) {
+                if (head.x === obs.x && head.y === obs.y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function drawGame() {
+            // Clear canvas
+            ctx.fillStyle = '#2c313a'; // Background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw obstacles
+            ctx.fillStyle = '#4b5263'; // Obstacle color
+            obstacles.forEach(obs => {
+                ctx.fillRect(obs.x * currentCellSize, obs.y * currentCellSize, currentCellSize - 1, currentCellSize - 1);
+            });
+
+            // Draw snake
+            snake.forEach((segment, index) => {
+                if (shieldActive) {
+                    ctx.fillStyle = index === 0 ? '#61dafb' : '#528bce'; // Shielded head and body
+                } else {
+                    ctx.fillStyle = index === 0 ? '#98c379' : '#61afef'; // Normal head and body
+                }
+                ctx.fillRect(segment.x * currentCellSize, segment.y * currentCellSize, currentCellSize - 1, currentCellSize - 1);
+                if (index === 0 && shieldActive) { // Draw shield indicator around head
+                    ctx.strokeStyle = '#e5c07b';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(segment.x * currentCellSize, segment.y * currentCellSize, currentCellSize - 1, currentCellSize - 1);
+                }
+            });
+
+            // Draw food
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(food.x * currentCellSize + currentCellSize / 2, food.y * currentCellSize + currentCellSize / 2, currentCellSize / 2.5, 0, 2 * Math.PI);
+            ctx.fill();
+
+
+            // Draw special items
+            specialItems.forEach(item => {
+                ctx.fillStyle = item.color;
+                ctx.fillRect(item.x * currentCellSize + currentCellSize / 4, item.y * currentCellSize + currentCellSize / 4, currentCellSize / 2, currentCellSize / 2);
+                // Simple text for item type (optional)
+                // ctx.fillStyle = "white";
+                // ctx.font = "8px Arial";
+                // ctx.fillText(item.type[0].toUpperCase(), item.x * currentCellSize + 2, item.y * currentCellSize + 8);
+            });
+
+            // Draw AI Path (if enabled and path exists)
+            if (aiEnabled && aiPath.length > 0) {
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)'; // Yellow, semi-transparent
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo((snake[0].x + 0.5) * currentCellSize, (snake[0].y + 0.5) * currentCellSize);
+                aiPath.forEach(pos => {
+                    ctx.lineTo((pos.x + 0.5) * currentCellSize, (pos.y + 0.5) * currentCellSize);
+                });
+                ctx.stroke();
+            }
+        }
+
+        function spawnFood() {
+            let newFoodPosition;
+            do {
+                newFoodPosition = {
+                    x: Math.floor(Math.random() * GRID_SIZE),
+                    y: Math.floor(Math.random() * GRID_SIZE)
+                };
+            } while (isOccupied(newFoodPosition.x, newFoodPosition.y));
+
+            food = { ...newFoodPosition, type: FoodType.NORMAL, points: 10, color: '#e06c75' }; // Red for normal food
+        }
+
+        function spawnSpecialItem() {
+            if (specialItems.length >= 3) return; // Max 3 special items
+
+            let newItemPosition;
+            do {
+                newItemPosition = {
+                    x: Math.floor(Math.random() * GRID_SIZE),
+                    y: Math.floor(Math.random() * GRID_SIZE)
+                };
+            } while (isOccupied(newItemPosition.x, newItemPosition.y));
+
+            const itemTypes = [
+                { type: FoodType.BONUS, points: 50, color: '#e5c07b' }, // Yellow for bonus
+                { type: FoodType.SLOWDOWN, points: 5, color: '#56b6c2' }, // Cyan for slowdown
+                { type: FoodType.SHIELD, points: 5, color: '#c678dd' } // Purple for shield
+            ];
+            const randomType = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+            specialItems.push({ ...newItemPosition, ...randomType });
+        }
+
+        function generateObstacles(count) {
+            obstacles = [];
+            for (let i = 0; i < count; i++) {
+                let obsPos;
+                do {
+                    obsPos = {
+                        x: Math.floor(Math.random() * GRID_SIZE),
+                        y: Math.floor(Math.random() * GRID_SIZE)
+                    };
+                    // Avoid spawning on initial snake position or too close to center
+                } while (isOccupied(obsPos.x, obsPos.y) || (Math.abs(obsPos.x - GRID_SIZE / 2) < 3 && Math.abs(obsPos.y - GRID_SIZE / 2) < 3));
+                obstacles.push(obsPos);
+            }
+        }
+
+        function isOccupied(x, y, checkSnake = true) {
+            if (checkSnake) {
+                for (const segment of snake) {
+                    if (segment.x === x && segment.y === y) return true;
+                }
+            }
+            if (food && food.x === x && food.y === y) return true;
+            for (const item of specialItems) {
+                if (item.x === x && item.y === y) return true;
+            }
+            for (const obs of obstacles) {
+                if (obs.x === x && obs.y === y) return true;
+            }
+            return false;
+        }
+
+        function updateScoreAndLength() {
+            scoreDisplay.textContent = score;
+            lengthDisplay.textContent = snakeLength;
+        }
+
+        function endGame() {
+            gameOver = true;
+            clearTimeout(gameLoopTimeout);
+            gameMessages.textContent = `Game Over! Final Score: ${score}. Press Reset.`;
+            startButton.disabled = true; // Keep start disabled, use reset
+            pauseButton.disabled = true;
+            resetButton.disabled = false;
+            difficultySelect.disabled = false;
+            aiToggle.disabled = false;
+            watchAiButton.disabled = false;
+        }
+
+        function togglePause() {
+            if (gameOver) return;
+            paused = !paused;
+            pauseButton.textContent = paused ? "Resume" : "Pause";
+            gameMessages.textContent = paused ? "Game Paused" : (aiEnabled ? "AI is playing..." : "Game Resumed");
+            if (!paused) {
+                gameLoop();
+            }
+        }
+
+        function resetGame() {
+            clearTimeout(gameLoopTimeout);
+            gameOver = true; // Set to true to allow initGame to set it to false
+            paused = false;
+
+            // Reset UI elements
+            score = 0;
+            snakeLength = 1;
+            updateScoreAndLength();
+            gameMessages.textContent = "Press Start to Play!";
+
+            startButton.disabled = false;
+            pauseButton.textContent = "Pause";
+            pauseButton.disabled = true;
+            resetButton.disabled = true;
+            difficultySelect.disabled = false;
+            aiToggle.disabled = false;
+            watchAiButton.disabled = false;
+
+            // Clear canvas for a clean slate before next game
+            ctx.fillStyle = '#2c313a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            // Optionally draw some placeholder or message
+        }
+
+        // Event Listeners
+        startButton.addEventListener('click', () => {
+            aiEnabled = aiToggle.checked;
+            initGame();
+        });
+
+        watchAiButton.addEventListener('click', () => {
+            aiToggle.checked = true; // Ensure AI is enabled
+            aiEnabled = true;
+            initGame();
+        });
+
+        pauseButton.addEventListener('click', togglePause);
+        resetButton.addEventListener('click', resetGame);
+
+        difficultySelect.addEventListener('change', () => {
+            if (!gameOver && !paused) { // If game is running, adjust speed immediately
+                gameSpeed = DIFFICULTIES[difficultySelect.value];
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (aiEnabled || paused || gameOver) return; // Player input ignored if AI active, paused, or game over
+
+            const key = e.key;
+            if ((key === 'ArrowUp' || key === 'w') && dy === 0) { dx = 0; dy = -1; }
+            else if ((key === 'ArrowDown' || key === 's') && dy === 0) { dx = 0; dy = 1; }
+            else if ((key === 'ArrowLeft' || key === 'a') && dx === 0) { dx = -1; dy = 0; }
+            else if ((key === 'ArrowRight' || key === 'd') && dx === 0) { dx = 1; dy = 0; }
+            else if (key === 'p' || key === 'P') { togglePause(); }
+        });
+
+        // --- AI Logic ---
+        function makeAiMove() {
+            const head = snake[0];
+            let target = food; // Default target is normal food
+
+            // Prioritize special items if they are beneficial (e.g. shield, or high score if safe)
+            if (specialItems.length > 0) {
+                // Simple: pick first special item. Could be smarter.
+                // For now, let's make it prefer any special item over normal food if path is similar
+                let bestSpecialItem = null;
+                let shortestSpecialPath = Infinity;
+
+                for (const item of specialItems) {
+                    const pathToItem = findPathBFS(head, item);
+                    if (pathToItem && pathToItem.length < shortestSpecialPath) {
+                        shortestSpecialPath = pathToItem.length;
+                        bestSpecialItem = item;
+                    }
+                }
+                const pathToNormalFood = findPathBFS(head, food);
+
+                if (bestSpecialItem && pathToNormalFood) {
+                    if (shortestSpecialPath <= pathToNormalFood.length + 5) { // Prefer special if path isn't much longer
+                        target = bestSpecialItem;
+                    }
+                } else if (bestSpecialItem) {
+                    target = bestSpecialItem;
+                }
+            }
+
+            const path = findPathBFS(head, target);
+            aiPath = path ? [...path] : []; // Store for visualization
+
+            if (path && path.length > 0) {
+                const nextMove = path[0];
+                dx = nextMove.x - head.x;
+                dy = nextMove.y - head.y;
+            } else {
+                // No path to food, try survival strategy (Hamiltonian-like or just find longest safe path)
+                // Simple survival: try to move towards largest open area or follow tail if possible
+                // This is a placeholder for more advanced Hamiltonian/space-filling logic
+                const possibleMoves = [
+                    { x: 0, y: -1, name: 'up' }, { x: 0, y: 1, name: 'down' },
+                    { x: -1, y: 0, name: 'left' }, { x: 1, y: 0, name: 'right' }
+                ];
+                let bestMove = null;
+                let maxSafeMoves = -1;
+
+                for (const move of possibleMoves) {
+                    // Avoid immediate reversal unless it's the only option (not handled here perfectly)
+                    if (snake.length > 1 && head.x + move.x === snake[1].x && head.y + move.y === snake[1].y) {
+                        continue;
+                    }
+
+                    const nextHead = { x: head.x + move.x, y: head.y + move.y };
+                    if (!isCollisionForAI(nextHead.x, nextHead.y)) {
+                        // A simple heuristic: count empty cells reachable from this move (very basic)
+                        // A better heuristic would be to simulate a few steps or use a flood fill to find largest area
+                        let currentSafeMoves = countReachableSafeCells(nextHead, 5); // Look ahead 5 steps
+                        if (currentSafeMoves > maxSafeMoves) {
+                            maxSafeMoves = currentSafeMoves;
+                            bestMove = move;
+                        }
+                    }
+                }
+
+                if (bestMove) {
+                    dx = bestMove.x;
+                    dy = bestMove.y;
+                } else {
+                    // Truly trapped or no safe move, AI will likely die on next step
+                    // Try any move that isn't an immediate reversal if possible
+                    for (const move of possibleMoves) {
+                        if (snake.length > 1 && head.x + move.x === snake[1].x && head.y + move.y === snake[1].y) continue;
+                        const nextHead = { x: head.x + move.x, y: head.y + move.y };
+                        if (nextHead.x >= 0 && nextHead.x < GRID_SIZE && nextHead.y >= 0 && nextHead.y < GRID_SIZE &&
+                            !snake.some(seg => seg.x === nextHead.x && seg.y === nextHead.y) && // avoid self
+                            !obstacles.some(obs => obs.x === nextHead.x && obs.y === nextHead.y) // avoid obstacles
+                        ) {
+                            dx = move.x;
+                            dy = move.y;
+                            return;
+                        }
+                    }
+                    // If all else fails, just continue current direction (will likely lead to game over)
+                }
+                aiPath = []; // Clear path if using survival move
+            }
+        }
+
+        function countReachableSafeCells(startNode, depth) {
+            // Simplified flood fill / BFS like count for open space
+            let count = 0;
+            let queue = [{ node: startNode, d: 0 }];
+            let visited = new Set();
+            visited.add(`${startNode.x},${startNode.y}`);
+
+            while (queue.length > 0) {
+                let { node, d } = queue.shift();
+                if (d >= depth) continue;
+                count++;
+
+                const moves = [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 1, y: 0 }];
+                for (const move of moves) {
+                    const nextX = node.x + move.x;
+                    const nextY = node.y + move.y;
+                    if (!isCollisionForAI(nextX, nextY) && !visited.has(`${nextX},${nextY}`)) {
+                        visited.add(`${nextX},${nextY}`);
+                        queue.push({ node: { x: nextX, y: nextY }, d: d + 1 });
+                    }
+                }
+            }
+            return count;
+        }
+
+
+        function findPathBFS(start, end) {
+            const queue = [[start]];
+            const visited = new Set();
+            visited.add(`${start.x},${start.y}`);
+
+            while (queue.length > 0) {
+                const path = queue.shift();
+                const node = path[path.length - 1];
+
+                if (node.x === end.x && node.y === end.y) {
+                    return path.slice(1); // Return path without the start node
+                }
+
+                const moves = [
+                    { x: 0, y: -1 }, { x: 0, y: 1 }, // Up, Down
+                    { x: -1, y: 0 }, { x: 1, y: 0 }  // Left, Right
+                ];
+                // Shuffle moves to avoid bias, or prioritize straight lines
+                // For now, simple order
+
+                for (const move of moves) {
+                    const nextX = node.x + move.x;
+                    const nextY = node.y + move.y;
+                    const neighborKey = `${nextX},${nextY}`;
+
+                    if (!isCollisionForAI(nextX, nextY, path.length) && !visited.has(neighborKey)) {
+                        // isCollisionForAI checks walls, current snake body, obstacles
+                        // The path.length can be used to check against future snake positions if snake grows
+                        // For simplicity, current implementation of isCollisionForAI doesn't predict snake growth during pathfinding
+                        visited.add(neighborKey);
+                        const newPath = [...path, { x: nextX, y: nextY }];
+                        queue.push(newPath);
+                    }
+                }
+            }
+            return null; // No path found
+        }
+
+        function isCollisionForAI(x, y, futureSteps = 0) {
+            // Wall collision
+            if (x < 0 || x >= GRID_SIZE || y < 0 || y >= GRID_SIZE) {
+                return true;
+            }
+            // Obstacle collision
+            for (const obs of obstacles) {
+                if (obs.x === x && obs.y === y) {
+                    return true;
+                }
+            }
+            // Snake self-collision (important: check against current snake body, excluding tail if it moves)
+            // The snake will move, so the last segment will be free unless it eats.
+            // This is a simplification; a perfect AI would predict its own body movement.
+            const snakeEffectiveLength = snake.length - (futureSteps > 0 ? 0 : 1); // If not eating, tail moves
+            for (let i = 0; i < snakeEffectiveLength; i++) {
+                if (snake[i].x === x && snake[i].y === y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // Initial setup on page load
+        function pageLoadSetup() {
+            canvas.width = 400;
+            canvas.height = 400;
+            currentCellSize = canvas.width / GRID_SIZE; // Recalculate cell size
+
+            specialItems = []; // Initialize special items array
+            obstacles = []; // Initialize obstacles array
+
+            // Draw initial empty board or welcome message
+            ctx.fillStyle = '#2c313a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#abb2bf';
+            ctx.font = '20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Welcome to Advanced Snake!', canvas.width / 2, canvas.height / 2 - 20);
+            ctx.fillText('Select difficulty and mode, then press Start.', canvas.width / 2, canvas.height / 2 + 20);
+
+            resetGame(); // Set initial button states correctly
+        }
+
+        pageLoadSetup(); // Call setup on load
+
+    </script>
+</body>
+
+</html>
