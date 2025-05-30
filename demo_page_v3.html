@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记忆编织者 (Weaver)</title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .hero-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .btn-primary {
+            background-color: #5a67d8;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background-color: #4c51bf;
+        }
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #4c51bf;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: background-color 0.3s ease;
+            border: 1px solid #cbd5e0;
+            cursor: pointer;
+        }
+        .btn-secondary:hover {
+            background-color: #cbd5e0;
+        }
+        .section-title {
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        .tag {
+            background-color: #e2e8f0;
+            color: #4a5568;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.875rem;
+            margin-right: 8px;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a0aec0; }
+
+        .streamed-narrative-container {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            min-height: 350px;
+            overflow-y: auto;
+            line-height: 1.8;
+            color: #374151;
+        }
+        .streamed-narrative-container p {
+            margin-bottom: 1rem;
+        }
+        .highlighted-text-segment {
+            background-color: #e0e7ff;
+            padding: 2px 4px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+        .narrative-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+        .narrative-text-content {
+            flex-basis: 30%;
+            flex-shrink: 0;
+        }
+        .generated-image-container {
+            flex-basis: 70%;
+            flex-shrink: 0;
+            height: 256px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed #cbd5e0;
+            border-radius: 8px;
+            background-color: #f8fafc;
+            overflow: hidden;
+        }
+        .generated-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 6px;
+        }
+        .image-generation-spinner {
+            width: 24px;
+            height: 24px;
+            border: 3px solid rgba(99, 102, 241, 0.2);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+        }
+
+        .spinner { animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .loading-text { font-size: 0.875rem; color: #4c51bf; margin-left: 0.5rem; }
+
+        .tab-navigation button {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #4a5568;
+            border-bottom: 2px solid transparent;
+            transition: color 0.3s ease, border-color 0.3s ease;
+        }
+        .tab-navigation button.active {
+            color: #5a67d8;
+            border-bottom-color: #5a67d8;
+        }
+        .tab-navigation button:hover:not(.active) {
+            color: #2d3748;
+        }
+        .interactive-prompt-input {
+            transition: width 0.3s ease-in-out;
+        }
+
+        /* Floating Video Player Styles */
+        #floating-video-player {
+            transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+            transform: translateY(20px); /* Start off-screen for slide-up effect */
+        }
+        #floating-video-player.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* --- START: Multimedia Album Styles --- */
+        #multimedia-album-section {
+            /* Uses .card styles */
+        }
+        #album-content-area {
+            transition: max-height 0.5s ease-out, opacity 0.3s ease-out;
+            overflow: hidden;
+            max-height: 0; /* Initially collapsed */
+            opacity: 0;
+            margin-top: 1rem; /* Space below the toggle button */
+        }
+        #album-content-area.expanded {
+            max-height: 1000px; /* Adjust as needed to fit content */
+            opacity: 1;
+        }
+        #album-item-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); /* Slightly smaller items */
+            gap: 1rem;
+            padding-top: 0.5rem; /* Reduced padding */
+        }
+        .note-component, .image-component {
+            background-color: #f9fafb; /* Tailwind gray-50 */
+            border: 1px solid #e5e7eb; /* Tailwind gray-200 */
+            border-radius: 8px;
+            padding: 0.75rem; /* Reduced padding */
+            text-align: center;
+            font-size: 0.875rem; /* Tailwind text-sm */
+            color: #4b5563; /* Tailwind gray-600 */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 120px; /* Ensure some consistent height */
+        }
+        .note-component h5, .image-component h5 {
+            font-weight: 600; /* Tailwind font-semibold */
+            margin-bottom: 0.5rem;
+            color: #1f2937; /* Tailwind gray-800 */
+            font-size: 0.875rem;
+        }
+        .note-component p, .image-component p {
+            line-height: 1.5;
+            font-size: 0.8rem; /* Slightly smaller text for content */
+            word-break: break-word;
+        }
+        .img-placeholder {
+            font-size: 2.5rem; /* Icon size */
+            color: #9ca3af; /* Tailwind gray-400 */
+            margin-bottom: 0.5rem;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .album-toggle-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 0.6rem 1rem;
+            font-weight: 500;
+            color: #4c51bf; /* Tailwind indigo-700 */
+            background-color: #e0e7ff; /* Tailwind indigo-100 */
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            font-size: 0.9rem;
+        }
+        .album-toggle-button:hover {
+            background-color: #c7d2fe; /* Tailwind indigo-200 */
+        }
+        .album-toggle-button .fas {
+            margin-left: 0.75rem;
+            transition: transform 0.3s ease;
+        }
+        .album-toggle-button.expanded .fas {
+            transform: rotate(180deg);
+        }
+        /* --- END: Multimedia Album Styles --- */
+
+    </style>
+</head>
+<body>
+    <nav class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-800">记忆编织者 (Weaver)</h1>
+            <span class="text-sm text-gray-600">让每一段旅程都成为传奇</span>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-6 py-8">
+
+        <section class="mb-12 text-center p-8 hero-bg text-white rounded-xl shadow-lg">
+            <h2 class="text-4xl font-bold mb-4">重塑您的旅行记忆</h2>
+            <p class="text-lg max-w-3xl mx-auto">
+                运用富有创造力的 LLM Agents 与洞悉万关联的知识图谱，将您每一次旅行中捕捉的多模态瞬间——无论是影像、声音还是文字感悟——从零散的片段升华为一段段独一无二、饱含情感的数字记忆传奇。
+            </p>
+        </section>
+
+        <div class="mb-8 tab-navigation flex justify-center border-b border-gray-300">
+            <button id="tab-add-memory" type="button">添加新的记忆</button>
+            <button id="tab-weave-results" type="button">编织新的回忆</button>
+        </div>
+
+        <div id="tab-content-area">
+            <section id="upload-section" class="mb-12">
+                <h2 class="section-title">开始新的记忆编织</h2>
+                <div class="card p-8">
+                    <form id="memory-form">
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label for="trip-name" class="block text-sm font-medium text-gray-700 mb-1">旅程名称</label>
+                                <input type="text" id="trip-name" name="trip-name" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：京都秋日私语">
+                            </div>
+                            <div>
+                                <label for="trip-start-date" class="block text-sm font-medium text-gray-700 mb-1">旅行开始日期</label>
+                                <input type="date" id="trip-start-date" name="trip-start-date" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                 <label for="trip-end-date" class="block text-sm font-medium text-gray-700 mb-1">旅行结束日期</label>
+                                <input type="date" id="trip-end-date" name="trip-end-date" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div>
+                                <label for="memory-location" class="block text-sm font-medium text-gray-700 mb-1">地点标记</label>
+                                <input type="text" id="memory-location" name="memory-location" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：清水寺, 京都, 日本">
+                            </div>
+                        </div>
+                        <div class="mb-6">
+                            <label for="memory-text" class="block text-sm font-medium text-gray-700 mb-1">文字感悟/笔记 (手动输入)</label>
+                            <textarea id="memory-text" name="memory-text" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="记录下此刻的心情、有趣的见闻..."></textarea>
+                        </div>
+                        <div class="mb-6">
+                            <label for="memory-notes-file" class="block text-sm font-medium text-gray-700 mb-1">上传文字感悟文件 (推荐 .txt, .md)</label>
+                            <input type="file" id="memory-notes-file" name="memory-notes-file" accept=".txt,.md" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                             <p class="text-xs text-gray-500 mt-1">如果同时提供了手动输入和文件，将优先使用文件内容。</p>
+                        </div>
+                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <div>
+                                <label for="memory-photos" class="block text-sm font-medium text-gray-700 mb-1">上传照片/视频 (概念)</label>
+                                <input type="file" id="memory-photos" name="memory-photos" multiple class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                <p class="text-xs text-gray-500 mt-1">选择您想要编织的照片或视频片段。</p>
+                            </div>
+                            <div>
+                                <label for="memory-music" class="block text-sm font-medium text-gray-700 mb-1">当时听的音乐 (可选)</label>
+                                <input type="text" id="memory-music" name="memory-music" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="例如：坂本龙一 - Merry Christmas Mr. Lawrence">
+                            </div>
+                        </div>
+                        <div class="text-center">
+                            <button type="button" id="weave-button" class="btn-primary text-lg px-8 py-3">
+                                开始编织记忆
+                            </button>
+                        </div>
+                    </form>
+                     <p id="form-error-msg" class="text-red-500 text-sm text-center my-2"></p>
+                </div>
+            </section>
+
+            <div id="results-wrapper" class="hidden">
+                <div id="loading-indicator" class="hidden text-center my-8">
+                    <div class="inline-flex items-center bg-white p-4 rounded-lg shadow-md">
+                        <svg class="animate-spin -ml-1 mr-3 h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="text-indigo-600 font-semibold text-lg">记忆编织中，请稍候...</span>
+                    </div>
+                </div>
+
+                <section id="multimedia-album-section" class="mb-12 card p-6 hidden">
+                    <button id="album-toggle-button" type="button" class="album-toggle-button">
+                        <span>我的多媒体素材 (点击展开/折叠)</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <div id="album-content-area"> 
+                        <div id="album-item-grid">
+                            {/* Items populated by populateMultimediaAlbum() */}
+                        </div>
+                        <p id="album-placeholder" class="text-gray-500 text-center py-4 hidden">正在加载多媒体内容...</p>
+                    </div>
+                </section>
+                <section id="streamed-narrative-section" class="mb-12 hidden">
+                    <h2 class="section-title">探索记忆，重现回忆</h2>
+                    <div class="mb-6 flex items-center justify-center space-x-2">
+                        <input type="text" id="interactive-prompt-input" class="interactive-prompt-input w-full md:w-3/5 p-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="关于这段回忆，您想了解或补充什么？">
+                        <button id="submit-interactive-prompt" type="button" class="btn-secondary px-6 py-3">提问</button>
+                    </div>
+                    <div class="card p-0">
+                        <div id="streamed-narrative-container" class="streamed-narrative-container">
+                            <p class="text-gray-500 text-center">正在连接AI，准备编织回忆...</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="woven-memories-section" class="mb-12 hidden">
+                    <h2 class="section-title">我的记忆画卷 (摘要)</h2>
+                    <div class="card p-6 md:p-8">
+                        <h3 id="woven-title" class="text-2xl md:text-3xl font-semibold text-indigo-700 mb-4"></h3>
+                        <div class="flex flex-wrap md:flex-nowrap gap-6">
+                            <div class="w-full md:w-1/3">
+                                <img id="woven-image" src="https://placehold.co/600x400/667eea/ffffff?text=旅行影像" alt="旅行影像" class="rounded-lg shadow-md mb-4 w-full h-auto object-cover aspect-video">
+                                <div class="space-y-2 text-sm">
+                                    <p><strong>📍 地点:</strong> <span id="woven-location"></span></p>
+                                    <p><strong>📅 旅行时段:</strong> <span id="woven-date-range"></span></p>
+                                    <p><strong>🎶 背景音乐:</strong> <span id="woven-music"></span></p>
+                                </div>
+                                <div class="mt-4">
+                                    <h4 class="font-semibold text-gray-700 mb-2">记忆标签:</h4>
+                                    <div id="woven-tags" class="flex flex-wrap"></div>
+                                </div>
+                            </div>
+                            <div class="w-full md:w-2/3">
+                                <h4 class="text-xl font-semibold text-gray-800 mb-3">AI 为您编织的故事 (快速概览):</h4>
+                                <div id="woven-story-container">
+                                    <div id="woven-story-summary" class="prose prose-indigo max-w-none text-gray-700 leading-relaxed text-justify bg-gray-50 p-4 rounded-md h-60 overflow-y-auto">
+                                    </div>
+                                    <div class="mt-4 text-right">
+                                        <button type="button" id="enhance-story-button" class="btn-secondary">
+                                            ✨ AI 深入探讨此记忆
+                                        </button>
+                                        <div id="enhance-story-loading" class="hidden inline-flex items-center ml-2">
+                                            <svg class="spinner h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span class="loading-text">深入探讨中...</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="exploration-section" class="mb-12 hidden">
+                    <h2 class="section-title">AI 智能洞察与历史回顾</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div class="card p-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-xl font-semibold text-gray-800">✨ AI 智能洞察</h3>
+                                <div id="insights-loading" class="hidden inline-flex items-center">
+                                    <svg class="spinner h-5 w-5 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span class="loading-text">生成中...</span>
+                                </div>
+                            </div>
+                            <ul id="ai-insights-list" class="text-gray-700 space-y-2 mb-4">
+                                <li><strong class="text-indigo-600">主要主题:</strong> <span data-insight="themes">待分析...</span></li>
+                                <li><strong class="text-green-600">情感倾向:</strong> <span data-insight="emotions">待分析...</span></li>
+                                <li><strong class="text-blue-600">未来建议:</strong> <span data-insight="recommendation">待分析...</span></li>
+                            </ul>
+                             <p class="text-xs text-gray-500 italic">这些洞察由 AI 动态生成。</p>
+                        </div>
+                         <div class="card p-6">
+                            <h3 class="text-xl font-semibold text-gray-800 mb-4">历史记忆回顾 (概念)</h3>
+                            <div id="history-preview-list" class="space-y-3 max-h-60 overflow-y-auto">
+                                <p class="text-gray-500">暂无历史记忆或加载中...</p>
+                            </div>
+                            <button class="mt-4 btn-primary w-full">查看所有历史 (概念)</button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="floating-video-player" class="hidden fixed bottom-5 right-5 w-80 bg-white rounded-lg shadow-2xl z-[1000] p-3 flex flex-col opacity-0">
+        <div class="flex justify-between items-center mb-2">
+            <span id="video-caption" class="text-sm font-medium text-gray-700 truncate w-full pr-2">视频演示</span>
+            <button id="close-video-player" type="button" class="text-xl text-gray-400 hover:text-gray-700 leading-none p-1 focus:outline-none">&times;</button>
+        </div>
+        <div class="bg-black rounded overflow-hidden h-44">
+            <video id="video-element" class="w-full h-full object-cover" controls>
+                <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4">
+                您的浏览器不支持视频标签。
+            </video>
+        </div>
+    </div>
+
+
+    <footer class="bg-gray-800 text-white py-8 text-center">
+        <p>&copy; 2025 记忆编织者 (Weaver). 保留所有权利.</p>
+        <p class="text-sm text-gray-400 mt-1">用心编织，让记忆永恒。</p>
+    </footer>
+
+    <script>
+        // DOM Elements (existing)
+        const weaveButton = document.getElementById('weave-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const formErrorMsg = document.getElementById('form-error-msg');
+        const tripNameInput = document.getElementById('trip-name');
+        const tripStartDateInput = document.getElementById('trip-start-date');
+        const tripEndDateInput = document.getElementById('trip-end-date');
+        const memoryLocationInput = document.getElementById('memory-location');
+        const memoryTextInput = document.getElementById('memory-text');
+        const memoryNotesFileInput = document.getElementById('memory-notes-file');
+        const memoryPhotosInput = document.getElementById('memory-photos');
+        const memoryMusicInput = document.getElementById('memory-music');
+        const tabAddMemory = document.getElementById('tab-add-memory');
+        const tabWeaveResults = document.getElementById('tab-weave-results');
+        const uploadSection = document.getElementById('upload-section');
+        const resultsWrapper = document.getElementById('results-wrapper');
+        const streamedNarrativeSection = document.getElementById('streamed-narrative-section');
+        const streamedNarrativeContainer = document.getElementById('streamed-narrative-container');
+        const interactivePromptInput = document.getElementById('interactive-prompt-input');
+        const submitInteractivePromptButton = document.getElementById('submit-interactive-prompt');
+        const wovenMemoriesSection = document.getElementById('woven-memories-section');
+        const wovenTitle = document.getElementById('woven-title');
+        const wovenImage = document.getElementById('woven-image');
+        const wovenLocationDisplay = document.getElementById('woven-location');
+        const wovenDateRangeDisplay = document.getElementById('woven-date-range');
+        const wovenMusicDisplay = document.getElementById('woven-music');
+        const wovenStorySummaryDisplay = document.getElementById('woven-story-summary');
+        const wovenTagsContainer = document.getElementById('woven-tags');
+        const explorationSection = document.getElementById('exploration-section');
+        const aiInsightsList = document.getElementById('ai-insights-list');
+        const historyPreviewList = document.getElementById('history-preview-list');
+        const enhanceStoryButton = document.getElementById('enhance-story-button');
+        const enhanceStoryLoading = document.getElementById('enhance-story-loading');
+        const insightsLoading = document.getElementById('insights-loading');
+
+        // === START: Multimedia Album DOM Elements ===
+        const multimediaAlbumSection = document.getElementById('multimedia-album-section');
+        const albumToggleButton = document.getElementById('album-toggle-button');
+        const albumContentArea = document.getElementById('album-content-area');
+        const albumItemGrid = document.getElementById('album-item-grid');
+        const albumPlaceholder = document.getElementById('album-placeholder');
+        // === END: Multimedia Album DOM Elements ===
+
+        // Floating Video Player DOM Elements
+        const floatingVideoPlayer = document.getElementById('floating-video-player');
+        const videoElement = document.getElementById('video-element');
+        const videoCaption = document.getElementById('video-caption');
+        const closeVideoPlayerButton = document.getElementById('close-video-player');
+
+        let currentTripDetailsForAI = {};
+        let currentWovenStoryForAI_Summary = "";
+        let hasWovenDynamicContent = false;
+        let currentStreamedNarrativeFullText = ""; // Stores the full narrative for context if needed
+
+        // API Keys and Model Names (Gemini parts are still used for other functionalities)
+        const GEMINI_API_KEY = "sk-Ce5ZSSasw3wtsEWtgUeaOy72yrrtab48YBSImx4fQ03nW5CA"; // User's original key
+        const GEMINI_TEXT_MODEL = "gemini-1.5-flash";
+        const IMAGEN_MODEL = "imagen-3.0-generate-002";
+
+        // Keywords for dynamic content generation
+        const HIGHLIGHT_KEYWORDS = ["景色", "经历", "风味", "感悟", "建筑", "河流", "山脉", "市集", "夜晚", "星空", "阳光", "瀑布", "森林", "海滩", "日出", "日落", "奇遇", "美味", "感动", "宁静", "繁华", "探索发现"];
+        const VIDEO_TRIGGER_KEYWORDS = ["视频记录显示", "现场演示", "动态过程", "观看这段影像", "生动的瞬间"];
+
+        // === START: Mock data for album ===
+        const mockAlbumDetails = {
+            notes: "这是一段关于北海道冬日雪景的笔记，记录了在小樽运河边漫步，品尝新鲜海产，以及在札幌雪祭上感受到的欢乐气氛。",
+            photosCount: 3, // Simulate 3 photos
+            music: "冬季恋歌 - 主题曲"
+        };
+        // === END: Mock data for album ===
+
+        // --- Tab Navigation ---
+        function setActiveTab(activeTabId) {
+            if (activeTabId === 'tab-add-memory') {
+                tabAddMemory.classList.add('active');
+                tabWeaveResults.classList.remove('active');
+                uploadSection.classList.remove('hidden');
+                resultsWrapper.classList.add('hidden');
+                hideFloatingVideoPlayer();
+                if (multimediaAlbumSection) multimediaAlbumSection.classList.add('hidden'); // Hide album when on add tab
+            } else if (activeTabId === 'tab-weave-results') {
+                tabWeaveResults.classList.add('active');
+                tabAddMemory.classList.remove('active');
+                uploadSection.classList.add('hidden');
+                resultsWrapper.classList.remove('hidden');
+
+                // === START: Album logic in tab switch ===
+                if (multimediaAlbumSection) { // Ensure element exists
+                    multimediaAlbumSection.classList.remove('hidden');
+                    // Populate based on whether actual content has been woven
+                    populateMultimediaAlbum(hasWovenDynamicContent ? currentTripDetailsForAI : mockAlbumDetails);
+                }
+                // === END: Album logic in tab switch ===
+
+                streamedNarrativeSection.classList.remove('hidden');
+
+                if (!hasWovenDynamicContent) {
+                    initiateNarrativeStreamWithGemini(null, true);
+                    wovenMemoriesSection.classList.add('hidden');
+                    explorationSection.classList.add('hidden');
+                } else {
+                    initiateNarrativeStreamWithGemini(currentTripDetailsForAI, false);
+                    wovenMemoriesSection.classList.remove('hidden');
+                    explorationSection.classList.remove('hidden');
+                }
+            }
+        }
+
+        tabAddMemory.addEventListener('click', () => setActiveTab('tab-add-memory'));
+        tabWeaveResults.addEventListener('click', () => setActiveTab('tab-weave-results'));
+
+        // --- Interactive Prompt Handling (custom API) ---
+        // This function is THE USER'S VERSION that was previously confirmed as working. NO CHANGES HERE.
+        async function handleInteractivePromptWithCustomAPI(userPrompt) {
+            const thinkingMsg = document.createElement('p');
+            thinkingMsg.className = 'text-gray-500 text-center my-2 italic';
+            thinkingMsg.textContent = '正在处理您的请求，这可能需要较长时间，请耐心等待...';
+            streamedNarrativeContainer.appendChild(thinkingMsg);
+            streamedNarrativeContainer.scrollTop = streamedNarrativeContainer.scrollHeight;
+
+            const customApiUrl = 'http://localhost:5000/api/chat';
+
+            console.log(`[${new Date().toLocaleTimeString()}] 开始调用自定义接口: ${customApiUrl}`);
+            console.log(`[${new Date().toLocaleTimeString()}] 请求体 (Payload):`, { message: userPrompt });
+
+            try {
+                const payload = { message: userPrompt };
+                const response = await fetch(customApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                console.log(`[${new Date().toLocaleTimeString()}] 收到API响应。状态码: ${response.status}, Ok: ${response.ok}`);
+
+                if (streamedNarrativeContainer.contains(thinkingMsg)) {
+                    streamedNarrativeContainer.removeChild(thinkingMsg);
+                }
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[${new Date().toLocaleTimeString()}] API返回错误状态，响应体:`, errorText);
+                    throw new Error(`自定义接口请求失败: ${response.status} - ${errorText}`);
+                }
+
+                console.log(`[${new Date().toLocaleTimeString()}] API响应成功，正在解析JSON...`);
+                const responseData = await response.json();
+                console.log(`[${new Date().toLocaleTimeString()}] JSON解析结果:`, responseData);
+
+                if (responseData && responseData.success && typeof responseData.message !== 'undefined') {
+                    const actualMessage = responseData.message;
+                    currentStreamedNarrativeFullText += `\n\n用户提问 (自定义接口)：${userPrompt}\n\n${actualMessage}`;
+                    await streamTextToContainer(actualMessage, "接口回应：");
+                    console.log(`[${new Date().toLocaleTimeString()}] 成功处理并显示API消息。`);
+                } else {
+                    console.error(`[${new Date().toLocaleTimeString()}] API响应成功但数据格式不正确或操作未成功:`, responseData);
+                    throw new Error(`API响应成功但数据格式不正确或操作未成功: ${JSON.stringify(responseData)}`);
+                }
+
+            } catch (error) {
+                console.error(`[${new Date().toLocaleTimeString()}] 调用自定义接口过程中发生错误:`, error);
+                if (streamedNarrativeContainer.contains(thinkingMsg)) {
+                    streamedNarrativeContainer.removeChild(thinkingMsg);
+                }
+                const errorMessage = error && error.message ? error.message : "未知错误";
+                appendSystemMessageToStream(`处理您的提问时出错 (自定义接口)：${errorMessage}`, "text-red-500");
+            }
+        }
+        submitInteractivePromptButton.addEventListener('click', () => {
+            const promptText = interactivePromptInput.value.trim();
+            if (promptText) {
+                console.log("Interactive prompt submitted to custom API:", promptText);
+                appendUserMessageToStream(promptText);
+                handleInteractivePromptWithCustomAPI(promptText); // Uses the function above
+                interactivePromptInput.value = '';
+            }
+            interactivePromptInput.classList.remove('md:w-3/5');
+            interactivePromptInput.classList.add('md:w-2/5');
+            setTimeout(() => {
+                 interactivePromptInput.classList.remove('md:w-2/5');
+                 interactivePromptInput.classList.add('md:w-3/5');
+            }, 2000);
+        });
+
+
+        // --- Floating Video Player ---
+        closeVideoPlayerButton.addEventListener('click', hideFloatingVideoPlayer);
+
+        function showFloatingVideoPlayer(paragraphText) {
+            console.log("Showing floating video player for paragraph:", paragraphText.substring(0, 50) + "...");
+            videoCaption.textContent = "视频: " + (paragraphText.substring(0, 30) + "..." || "相关影像");
+            videoElement.src = "https://www.w3schools.com/html/mov_bbb.mp4"; // Placeholder video
+            floatingVideoPlayer.classList.remove('hidden');
+            setTimeout(() => {
+                floatingVideoPlayer.classList.add('visible');
+                floatingVideoPlayer.classList.remove('opacity-0');
+            }, 50);
+            videoElement.play().catch(e => console.warn("Video play failed, possibly due to browser policy:", e));
+        }
+
+        function hideFloatingVideoPlayer() {
+            floatingVideoPlayer.classList.remove('visible');
+            floatingVideoPlayer.classList.add('opacity-0');
+            setTimeout(() => {
+                floatingVideoPlayer.classList.add('hidden');
+            }, 300);
+            videoElement.pause();
+            videoElement.currentTime = 0;
+        }
+
+        // --- Stream Utility Functions ---
+        function appendUserMessageToStream(message) {
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'my-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-indigo-700 text-right';
+            userMsgDiv.innerHTML = `<p class="font-semibold">您：</p><p>${message}</p>`;
+            streamedNarrativeContainer.appendChild(userMsgDiv);
+            streamedNarrativeContainer.scrollTop = streamedNarrativeContainer.scrollHeight;
+        }
+
+        function appendSystemMessageToStream(message, cssClass = "text-gray-500") {
+            const sysMsgDiv = document.createElement('div');
+            sysMsgDiv.className = `my-4 p-3 bg-gray-100 border border-gray-200 rounded-lg ${cssClass}`;
+            sysMsgDiv.innerHTML = `<p>${message}</p>`;
+            streamedNarrativeContainer.appendChild(sysMsgDiv);
+            streamedNarrativeContainer.scrollTop = streamedNarrativeContainer.scrollHeight;
+        }
+
+        // --- Main Weaving Logic (Uses Gemini for initial story and image generation) ---
+        // UNCHANGED from user's provided code
+        weaveButton.addEventListener('click', async () => {
+            formErrorMsg.textContent = "";
+            const tripName = tripNameInput.value.trim();
+            const tripStartDate = tripStartDateInput.value;
+            const tripEndDate = tripEndDateInput.value;
+            const memoryLocation = memoryLocationInput.value.trim();
+            let memoryTextContent = memoryTextInput.value.trim();
+            const notesFile = memoryNotesFileInput.files[0];
+            const photoFiles = memoryPhotosInput.files;
+            const memoryMusic = memoryMusicInput.value.trim();
+
+            if (!tripName || !tripStartDate || !memoryLocation) {
+                formErrorMsg.textContent = "旅程名称、开始日期和地点标记不能为空！"; return;
+            }
+            if (tripEndDate && tripEndDate < tripStartDate) {
+                formErrorMsg.textContent = "结束日期不能早于开始日期！"; return;
+            }
+            if (notesFile) {
+                try { memoryTextContent = await notesFile.text(); }
+                catch (e) { formErrorMsg.textContent = "读取笔记文件失败。"; return; }
+            }
+             if (!memoryTextContent && (!photoFiles || photoFiles.length === 0) ) { // Check if photoFiles itself is null or length 0
+                 formErrorMsg.textContent = "请提供文字感悟或上传照片。"; return;
+            }
+
+            currentTripDetailsForAI = {
+                name: tripName, startDate, endDate: tripEndDate, location: memoryLocation,
+                notes: memoryTextContent, music: memoryMusic, photosCount: photoFiles ? photoFiles.length : 0
+            };
+
+            hasWovenDynamicContent = true;
+            setActiveTab('tab-weave-results'); // This will now also call populateMultimediaAlbum
+
+            loadingIndicator.classList.remove('hidden');
+            wovenMemoriesSection.classList.add('hidden');
+            explorationSection.classList.add('hidden');
+            streamedNarrativeSection.classList.remove('hidden');
+
+            await initiateNarrativeStreamWithGemini(currentTripDetailsForAI, false);
+
+            setTimeout(async () => {
+                loadingIndicator.classList.add('hidden');
+                wovenTitle.textContent = `${tripName} - 记忆摘要`;
+                if (photoFiles && photoFiles.length > 0) {
+                     try {
+                        // Create a URL for the first uploaded file to display it.
+                        // This is client-side only and doesn't involve actual upload to a server yet.
+                        wovenImage.src = URL.createObjectURL(photoFiles[0]);
+                        // Optional: Revoke the object URL when it's no longer needed to free up resources
+                        // wovenImage.onload = () => { URL.revokeObjectURL(wovenImage.src); }
+                    } catch (e) {
+                        console.warn("Could not create object URL for photo, using placeholder.", e);
+                        wovenImage.src = `https://placehold.co/600x400/764ba2/ffffff?text=${encodeURIComponent(tripName.substring(0,10))}`;
+                    }
+                } else {
+                    wovenImage.src = `https://placehold.co/600x400/667eea/ffffff?text=${encodeURIComponent(tripName.substring(0,10)) || '旅行影像'}`;
+                }
+                wovenImage.alt = tripName;
+                wovenLocationDisplay.textContent = memoryLocation;
+                let dateText = tripStartDate;
+                if (tripEndDate) dateText += ` 至 ${tripEndDate}`;
+                wovenDateRangeDisplay.textContent = dateText;
+                wovenMusicDisplay.textContent = memoryMusic || "未记录";
+
+                currentWovenStoryForAI_Summary = `<p>${(memoryTextContent || "一次难忘的旅行").substring(0, 150).replace(/\n/g, '<br>')}...</p><p class="text-sm text-gray-500 mt-2">(详细回忆请查看上方“探索记忆，重现回忆”区域)</p>`;
+                wovenStorySummaryDisplay.innerHTML = currentWovenStoryForAI_Summary;
+
+                wovenTagsContainer.innerHTML = '';
+                const tagsSet = new Set(['旅行', tripName.substring(0,5).trim(), ...memoryLocation.split(',').map(s => s.trim().substring(0,10))]);
+                if (memoryMusic) tagsSet.add(memoryMusic.split('-')[0].trim().substring(0,10));
+                tagsSet.forEach(tagText => {
+                    if(tagText) {
+                        const tag = document.createElement('span');
+                        tag.className = 'tag';
+                        tag.textContent = tagText;
+                        wovenTagsContainer.appendChild(tag);
+                    }
+                });
+
+                wovenMemoriesSection.classList.remove('hidden');
+                explorationSection.classList.remove('hidden');
+                await generateInsightsWithAI(currentTripDetailsForAI);
+                updateHistoryPreview({
+                    id: Date.now(), title: tripName, date: tripStartDate,
+                    snippet: (memoryTextContent || "一次难忘的旅行").substring(0, 50) + "..."
+                });
+            }, 500);
+        });
+
+        // --- Text Streaming and Dynamic Content (Images/Video Placeholders) ---
+        // UNCHANGED from user's provided code
+        async function streamTextToContainer(text, prefix = "") {
+            const paragraphs = text.split('\n\n').filter(p => p.trim() !== '');
+            for (let i = 0; i < paragraphs.length; i++) {
+                const paragraphText = paragraphs[i];
+                const pElement = document.createElement('div');
+                pElement.className = 'narrative-item';
+
+                const textSpan = document.createElement('span');
+                textSpan.className = 'narrative-text-content';
+                if (i === 0 && prefix) {
+                    const prefixStrong = document.createElement('strong');
+                    prefixStrong.textContent = prefix;
+                    textSpan.appendChild(prefixStrong);
+                    textSpan.appendChild(document.createElement('br'));
+                }
+                pElement.appendChild(textSpan);
+                streamedNarrativeContainer.appendChild(pElement);
+
+                const words = paragraphText.split(' ');
+                for (const word of words) {
+                    textSpan.innerHTML += word + ' ';
+                    await new Promise(resolve => setTimeout(resolve, 30));
+                    streamedNarrativeContainer.scrollTop = streamedNarrativeContainer.scrollHeight;
+                }
+                textSpan.innerHTML = textSpan.innerHTML.trim();
+
+                const containsHighlightKeyword = HIGHLIGHT_KEYWORDS.some(keyword => paragraphText.includes(keyword));
+                const containsVideoKeyword = VIDEO_TRIGGER_KEYWORDS.some(keyword => paragraphText.includes(keyword));
+
+                if (containsHighlightKeyword && !containsVideoKeyword) {
+                    console.log("Keyword found, triggering image generation for:", paragraphText.substring(0,50) + "...");
+                    textSpan.classList.add('highlighted-text-segment');
+                    const imageContainer = document.createElement('div');
+                    imageContainer.className = 'generated-image-container';
+                    const spinner = document.createElement('div');
+                    spinner.className = 'spinner image-generation-spinner';
+                    imageContainer.appendChild(spinner);
+                    pElement.appendChild(imageContainer);
+
+                    setTimeout(async () => {
+                        try {
+                            const imageUrl = await generateImageWithImagenAPI(paragraphText.substring(0, 200)); // Max 200 chars for prompt
+                            console.log("Image generated successfully for:", paragraphText.substring(0,50) + "...");
+                            imageContainer.innerHTML = '';
+                            const img = document.createElement('img');
+                            img.src = imageUrl;
+                            img.alt = `AI 生成的关于“${paragraphText.substring(0, 20)}...”的图片`;
+                            imageContainer.appendChild(img);
+                        } catch (imgError) {
+                            console.error("Image generation error:", imgError);
+                            imageContainer.innerHTML = '<p class="text-xs text-red-500">图片生成失败</p>';
+                        }
+                    }, 1000);
+                } else if (containsVideoKeyword) {
+                    console.log("Video keyword found, showing floating video for:", paragraphText.substring(0,50) + "...");
+                    showFloatingVideoPlayer(paragraphText);
+                }
+
+                 if (i < paragraphs.length - 1) {
+                    textSpan.innerHTML += '<br><br>';
+                }
+            }
+        }
+
+        // --- Gemini API for Initial Narrative Stream ---
+        // UNCHANGED from user's provided code (including Authorization header)
+        async function initiateNarrativeStreamWithGemini(tripDetails, isPlaceholder = false) {
+            streamedNarrativeContainer.innerHTML = `<p class="text-gray-500 text-center">${isPlaceholder ? '正在加载示例回忆...' : 'AI 正在为您编织回忆，请稍候...'}</p>`;
+            currentStreamedNarrativeFullText = "";
+            hideFloatingVideoPlayer();
+            let prompt;
+
+            if (isPlaceholder) {
+                prompt = "请为我编织一段关于一次意外发现一个隐藏瀑布的旅行的示例回忆。包含一些景色描写和当时的心情。用中文写，分成3-4个段落。确保包含一些关键词，例如“美丽的景色”或“清澈的河流”或“瀑布”。在其中一段尝试包含“视频记录显示了水流的动态过程”。";
+            } else {
+                prompt = `请为我编织一段关于旅程“${tripDetails.name}”的详细回忆。\n地点：${tripDetails.location}\n日期：${tripDetails.startDate}${tripDetails.endDate ? ' 至 ' + tripDetails.endDate : ''}\n我的笔记：\n${tripDetails.notes}\n当时听的音乐：${tripDetails.music || '未记录'}\n\n请基于以上信息，特别是我的笔记，用生动的语言、丰富的细节和情感来描绘这段旅程。请分成多个段落，用中文写。请尝试在描述中自然地使用一些词语，如：“景色”、“经历”、“瀑布”、“森林”、“海滩”、“日出”、“日落”、“感悟”、“建筑”、“河流”、“山脉”、“市集”、“夜晚”、“星空”、“阳光”。如果合适，可以加入一句如“视频记录显示了当时的动态过程”来触发视频。`;
+            }
+
+            try {
+                const chatHistory = [{ role: "user", content: prompt }];
+                const payload = { messages: chatHistory, model: GEMINI_TEXT_MODEL };
+                const apiUrl = `https://api.openai-proxy.org/v1/chat/completions`; // User's proxy
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": GEMINI_API_KEY}, body: JSON.stringify(payload) });
+
+
+                if (!response.ok) throw new Error(`Gemini API 请求失败: ${response.status}`);
+                const result = await response.json();
+
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                    const fullText = result.candidates[0].content.parts[0].text;
+                    currentStreamedNarrativeFullText = fullText;
+                    streamedNarrativeContainer.innerHTML = '';
+                    await streamTextToContainer(fullText);
+                } else {
+                    streamedNarrativeContainer.innerHTML = '<p class="text-red-500 text-center">AI正在生成回忆内容。</p>';
+                }
+            } catch (error) {
+                console.error("流式回忆生成失败 (Gemini):", error);
+                streamedNarrativeContainer.innerHTML = `<p class="text-red-500 text-center">加载回忆时出错：${error.message}</p>`;
+            }
+        }
+
+        // --- Text2Image API for Image Generation (called from streamTextToContainer) ---
+        async function generateImageWithImagenAPI(promptText) {
+            console.log("Requesting image from localhost text2image API with prompt:", promptText);
+            
+            const customApiUrl = 'http://localhost:5000/api/chat/text2image';
+            const payload = { text: promptText };
+
+            console.log(`[${new Date().toLocaleTimeString()}] 开始调用文本生成图片接口: ${customApiUrl}`);
+            console.log(`[${new Date().toLocaleTimeString()}] 请求体 (Payload):`, payload);
+
+            try {
+                const response = await fetch(customApiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                console.log(`[${new Date().toLocaleTimeString()}] 收到图片生成API响应。状态码: ${response.status}, Ok: ${response.ok}`);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[${new Date().toLocaleTimeString()}] 图片生成API返回错误状态，响应体:`, errorText);
+                    throw new Error(`文本生成图片接口请求失败: ${response.status} - ${errorText}`);
+                }
+
+                console.log(`[${new Date().toLocaleTimeString()}] 图片生成API响应成功，正在解析JSON...`);
+                const responseData = await response.json();
+                console.log(`[${new Date().toLocaleTimeString()}] 图片生成JSON解析结果:`, responseData);
+
+                if (responseData && responseData.success && responseData.image_data) {
+                    // Get the first image URL from the image_data object
+                    const imageUrls = Object.values(responseData.image_data);
+                    if (imageUrls.length > 0) {
+                        console.log("Text2Image API success, returning first image URL:", imageUrls[0]);
+                        return imageUrls[0];
+                    } else {
+                        throw new Error("图片生成成功但未返回图片URL");
+                    }
+                } else {
+                    console.error(`[${new Date().toLocaleTimeString()}] 图片生成API响应成功但数据格式不正确:`, responseData);
+                    throw new Error(`图片生成API响应成功但数据格式不正确: ${JSON.stringify(responseData)}`);
+                }
+
+            } catch (error) {
+                console.error(`[${new Date().toLocaleTimeString()}] 调用文本生成图片接口过程中发生错误:`, error);
+                const errorMessage = error && error.message ? error.message : "未知错误";
+                console.error("Image generation error:", errorMessage);
+                // Return placeholder on error
+                throw new Error(`图片生成失败: ${errorMessage}`);
+            }
+        }
+
+        // --- Gemini API for Enhancing Story Summary ---
+        // UNCHANGED from user's provided code (including Authorization header)
+        enhanceStoryButton.addEventListener('click', async () => {
+            enhanceStoryButton.disabled = true;
+            enhanceStoryLoading.classList.remove('hidden');
+            const originalSummary = wovenStorySummaryDisplay.innerHTML;
+            wovenStorySummaryDisplay.innerHTML += `<p class="text-center text-indigo-600 my-2">AI 正在深入思考...</p>`;
+
+            const prompt = `这是一段旅行记忆的摘要：\n旅程名称：${currentTripDetailsForAI.name}，地点：${currentTripDetailsForAI.location}\n用户笔记：${currentTripDetailsForAI.notes}\n摘要内容：${currentWovenStoryForAI_Summary.replace(/<[^>]*>/g, '')} \n请基于以上信息，对这段记忆进行更深入的探讨和细节补充，返回一段约2-3个段落的丰富描述 (HTML格式，使用 <p> 标签)。`;
+
+            try {
+                const chatHistory = [{ role: "user", content: prompt }];
+                const payload = { messages: chatHistory, model: GEMINI_TEXT_MODEL };
+                const apiUrl = `https://api.openai-proxy.org/v1/chat/completions`; // User's proxy
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": GEMINI_API_KEY}, body: JSON.stringify(payload) });
+                if (!response.ok) throw new Error(`Gemini API 请求失败: ${response.status}`);
+                const result = await response.json();
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                    const enhancedText = result.candidates[0].content.parts[0].text;
+                    wovenStorySummaryDisplay.innerHTML = enhancedText;
+                    currentWovenStoryForAI_Summary = enhancedText;
+                } else {
+                     wovenStorySummaryDisplay.innerHTML = originalSummary + `<p class="text-red-500 text-center">AI 深入探讨失败。</p>`;
+                }
+            } catch (error) {
+                console.error("Enhance story error:", error);
+                wovenStorySummaryDisplay.innerHTML = originalSummary + `<p class="text-red-500 text-center">错误: ${error.message}</p>`;
+            } finally {
+                enhanceStoryLoading.classList.add('hidden');
+            }
+        });
+
+        // --- Gemini API for AI Insights ---
+        // UNCHANGED from user's provided code (including Authorization header and responseSchema)
+        async function generateInsightsWithAI(tripDetails) {
+            insightsLoading.classList.remove('hidden');
+            aiInsightsList.querySelector('[data-insight="themes"]').textContent = '分析中...';
+            aiInsightsList.querySelector('[data-insight="emotions"]').textContent = '分析中...';
+            aiInsightsList.querySelector('[data-insight="recommendation"]').textContent = '分析中...';
+
+            const prompt = `这是一次旅行的详细信息：\n旅程名称：${tripDetails.name}，地点：${tripDetails.location}，时段：${tripDetails.startDate}至${tripDetails.endDate || tripDetails.startDate}。\n用户笔记：${tripDetails.notes}，音乐：${tripDetails.music || '未记录'}\n请基于以上信息，为用户提供旅行洞察。请以JSON格式返回，包含以下键：'themes' (字符串数组，2-3个主要主题), 'emotions' (字符串数组，1-2个主要情感倾向), 'recommendation' (字符串，一个未来推荐)。请用中文提供所有文本内容。`;
+
+            const generationConfig = { // This was in user's original code, keeping it.
+                responseMimeType: "application/json",
+                responseSchema: { type: "OBJECT", properties: {
+                        "themes": { "type": "ARRAY", "items": { "type": "STRING" } },
+                        "emotions": { "type": "ARRAY", "items": { "type": "STRING" } },
+                        "recommendation": { "type": "STRING" }
+                    }, required: ["themes", "emotions", "recommendation"]
+                }
+            };
+
+            try {
+                const chatHistory = [{ role: "user", content: prompt }];
+                // Note: generationConfig is defined but not directly used in the fetch payload here
+                // This matches the user's provided code. If it's meant to be used, the payload or API call might need adjustment
+                // For now, keeping it as is to not modify the API call.
+                const payload = { messages: chatHistory, model: GEMINI_TEXT_MODEL /*, generationConfig: generationConfig */ }; // User had generationConfig here in comment, keeping as is
+                const apiUrl = `https://api.openai-proxy.org/v1/chat/completions`; // User's proxy
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', "Authorization": GEMINI_API_KEY}, body: JSON.stringify(payload) });
+
+                if (!response.ok) throw new Error(`Gemini API (Insights) 请求失败: ${response.status}`);
+                const result = await response.json();
+
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0]) {
+                    const insightsJSONString = result.candidates[0].content.parts[0].text;
+                    try {
+                        const insights = JSON.parse(insightsJSONString.replace(/```json\n?|\n?```/g, '').trim()); // Clean potential markdown
+                        aiInsightsList.querySelector('[data-insight="themes"]').textContent = insights.themes && insights.themes.length > 0 ? insights.themes.join(', ') : '未能分析';
+                        aiInsightsList.querySelector('[data-insight="emotions"]').textContent = insights.emotions && insights.emotions.length > 0 ? insights.emotions.join(', ') : '未能分析';
+                        aiInsightsList.querySelector('[data-insight="recommendation"]').textContent = insights.recommendation || '未能提供';
+                    } catch (parseError) {
+                        console.error("Error parsing insights JSON:", parseError, "Raw text:", insightsJSONString);
+                        throw new Error("AI 洞察返回了无效的JSON格式。");
+                    }
+                } else {
+                    throw new Error("AI 洞察未能获取有效内容。");
+                }
+            } catch (error) {
+                console.error("Generate insights error:", error);
+                aiInsightsList.querySelector('[data-insight="themes"]').textContent = `错误`;
+                aiInsightsList.querySelector('[data-insight="emotions"]').textContent = '失败';
+                aiInsightsList.querySelector('[data-insight="recommendation"]').textContent = '失败';
+            } finally {
+                insightsLoading.classList.add('hidden');
+            }
+        }
+
+        // --- Mock History Preview ---
+        let mockHistoryStore = [];
+        function updateHistoryPreview(newItem) {
+            if (newItem) {
+                mockHistoryStore.unshift(newItem);
+                if (mockHistoryStore.length > 5) mockHistoryStore.pop();
+            }
+            historyPreviewList.innerHTML = '';
+            if (mockHistoryStore.length === 0) {
+                historyPreviewList.innerHTML = '<p class="text-gray-500">暂无历史记忆。</p>'; return;
+            }
+            mockHistoryStore.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'p-3 bg-gray-50 rounded-md shadow-sm hover:bg-gray-100 transition-colors cursor-pointer';
+                div.innerHTML = `<h5 class="font-semibold text-sm text-indigo-700">${item.title}</h5><p class="text-xs text-gray-500">${item.date}</p><p class="text-xs text-gray-600 mt-1">${item.snippet}</p>`;
+                div.addEventListener('click', () => {
+                    formErrorMsg.textContent = `概念：已选择历史记忆 "${item.title}"。实际加载逻辑可在此实现。`;
+                    tripNameInput.value = item.title;
+                });
+                historyPreviewList.appendChild(div);
+            });
+        }
+
+        // === START: Album API Functions ===
+        async function fetchMemoryAlbumFromAPI(memoryId = null) {
+            try {
+                const albumApiUrl = 'http://localhost:5000/api/memories/album';
+                const url = memoryId ? `${albumApiUrl}?memory_id=${encodeURIComponent(memoryId)}` : albumApiUrl;
+                
+                console.log(`[${new Date().toLocaleTimeString()}] 开始调用记忆相册接口: ${url}`);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                console.log(`[${new Date().toLocaleTimeString()}] 收到相册API响应。状态码: ${response.status}, Ok: ${response.ok}`);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`[${new Date().toLocaleTimeString()}] 相册API返回错误状态，响应体:`, errorText);
+                    throw new Error(`记忆相册接口请求失败: ${response.status} - ${errorText}`);
+                }
+
+                const responseData = await response.json();
+                console.log(`[${new Date().toLocaleTimeString()}] 相册API JSON解析结果:`, responseData);
+
+                if (responseData && responseData.success && responseData.album) {
+                    return responseData.album;
+                } else {
+                    console.warn(`[${new Date().toLocaleTimeString()}] 相册API响应成功但数据格式不正确:`, responseData);
+                    return [];
+                }
+
+            } catch (error) {
+                console.error(`[${new Date().toLocaleTimeString()}] 调用记忆相册接口过程中发生错误:`, error);
+                return [];
+            }
+        }
+        // === END: Album API Functions ===
+
+        // === START: Multimedia Album Functionality ===
+        async function populateMultimediaAlbum(tripDetails) {
+            if (!albumItemGrid || !albumPlaceholder || !multimediaAlbumSection) {
+                console.error("Album DOM elements not found!");
+                return;
+            }
+            
+            console.log("Populating multimedia album with tripDetails:", tripDetails);
+            albumItemGrid.innerHTML = ''; // Clear previous items
+            let itemCount = 0;
+
+            // First, try to fetch content from API
+            albumPlaceholder.classList.remove('hidden');
+            albumPlaceholder.textContent = "正在加载多媒体内容...";
+            
+            console.log("Fetching album content from API...");
+            const apiAlbumContent = await fetchMemoryAlbumFromAPI();
+            console.log("API album content received:", apiAlbumContent);
+            
+            // Display API content first if available
+            if (apiAlbumContent && apiAlbumContent.length > 0) {
+                console.log(`Displaying ${apiAlbumContent.length} API album items`);
+                apiAlbumContent.forEach((content, index) => {
+                    itemCount++;
+                    const apiDiv = document.createElement('div');
+                    apiDiv.className = 'note-component !bg-green-50 !border-green-200 !text-green-700';
+                    apiDiv.innerHTML = `<h5><i class="fas fa-database mr-2"></i>记忆片段 ${index + 1}</h5><p>${content.substring(0, 120).replace(/\n/g, '<br>')}${content.length > 120 ? '...' : ''}</p>`;
+                    albumItemGrid.appendChild(apiDiv);
+                });
+            } else {
+                console.log("No API album content available, using mock/tripDetails data");
+            }
+
+            // Then display existing tripDetails or mock data
+            const detailsToUse = tripDetails && Object.keys(tripDetails).length > 0 ? tripDetails : mockAlbumDetails;
+            console.log("Using details for album:", detailsToUse);
+
+            // Populate Notes from tripDetails/mock
+            if (detailsToUse && detailsToUse.notes) {
+                itemCount++;
+                const noteDiv = document.createElement('div');
+                noteDiv.className = 'note-component';
+                noteDiv.innerHTML = `<h5><i class="fas fa-sticky-note mr-2"></i>我的笔记片段</h5><p>${detailsToUse.notes.substring(0, 120).replace(/\n/g, '<br>')}${detailsToUse.notes.length > 120 ? '...' : ''}</p>`;
+                albumItemGrid.appendChild(noteDiv);
+            }
+
+            // Populate Photos (placeholders)
+            if (detailsToUse && detailsToUse.photosCount > 0) {
+                for (let i = 0; i < Math.min(detailsToUse.photosCount, 3); i++) {
+                    itemCount++;
+                    const imgDiv = document.createElement('div');
+                    imgDiv.className = 'image-component';
+                    imgDiv.innerHTML = `<div class="img-placeholder"><i class="fas fa-image"></i></div><p>旅行照片 ${i + 1} ${detailsToUse === tripDetails ? '(已上传)' : '(示例)'}</p>`;
+                    albumItemGrid.appendChild(imgDiv);
+                }
+            }
+
+            // Populate Music
+            if (detailsToUse && detailsToUse.music) {
+                itemCount++;
+                const musicDiv = document.createElement('div');
+                musicDiv.className = 'note-component !bg-purple-50 !border-purple-200 !text-purple-700';
+                musicDiv.innerHTML = `<h5><i class="fas fa-music mr-2"></i>背景旋律</h5><p>当时聆听: ${detailsToUse.music}</p>`;
+                albumItemGrid.appendChild(musicDiv);
+            }
+
+            // Conceptual: Add a video placeholder if narrative mentioned video
+            if (currentStreamedNarrativeFullText.toLowerCase().includes("视频记录")) {
+                itemCount++;
+                const videoDiv = document.createElement('div');
+                videoDiv.className = 'image-component !bg-blue-50 !border-blue-200 !text-blue-700';
+                videoDiv.innerHTML = `<div class="img-placeholder"><i class="fas fa-video"></i></div><p>相关视频 (概念)</p>`;
+                albumItemGrid.appendChild(videoDiv);
+            }
+
+            if (itemCount === 0) {
+                albumPlaceholder.classList.remove('hidden');
+                albumPlaceholder.textContent = "暂无多媒体内容可显示。";
+            } else {
+                albumPlaceholder.classList.add('hidden');
+            }
+        }
+
+        if (albumToggleButton) {
+            albumToggleButton.addEventListener('click', () => {
+                albumContentArea.classList.toggle('expanded');
+                albumToggleButton.classList.toggle('expanded');
+                const icon = albumToggleButton.querySelector('.fas');
+                if (icon) {
+                    icon.classList.toggle('fa-chevron-down');
+                    icon.classList.toggle('fa-chevron-up');
+                }
+            });
+        }
+        // === END: Multimedia Album Functionality ===
+
+
+        // --- Initial Setup ---
+        document.addEventListener('DOMContentLoaded', () => {
+            setActiveTab('tab-add-memory');
+            updateHistoryPreview();
+
+            // === START: Album Initialization on DOMContentLoaded ===
+            if (albumContentArea && albumToggleButton) {
+                albumContentArea.classList.remove('expanded'); // Start collapsed
+                albumToggleButton.classList.remove('expanded');
+                const icon = albumToggleButton.querySelector('.fas');
+                if (icon) { // Set initial icon state
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                }
+                // If results tab is somehow visible by default (e.g., during development)
+                if (resultsWrapper && !resultsWrapper.classList.contains('hidden') && multimediaAlbumSection && multimediaAlbumSection.classList.contains('hidden')) {
+                     // This case should be rare if default tab is 'add-memory'
+                } else if (resultsWrapper && !resultsWrapper.classList.contains('hidden') && multimediaAlbumSection && !multimediaAlbumSection.classList.contains('hidden')) {
+                    populateMultimediaAlbum(mockAlbumDetails); // Populate if results tab + album section are visible
+                }
+
+            } else {
+                console.warn("Album toggle button or content area not found on DOMContentLoaded for initial setup.");
+            }
+             // === END: Album Initialization on DOMContentLoaded ===
+        });
+
+    </script>
+</body>
+</html>

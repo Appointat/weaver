@@ -1,0 +1,85 @@
+[tool.poetry]
+name = "Weaver"
+version = "0.1.0"
+description = "Weaver: Organize and explore fragments of travel memories, adding narrative structure and emotional depth."
+authors = ["Kuda <kuda.czk@antgroup.com>"]
+packages = [
+    { include = "weaver" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.12"
+chat2graph = {git = "https://github.com/Appointat/chat2graph.git", branch = "version/hackthon"}
+dotenv = "^0.9.9"
+
+[[tool.poetry.source]]
+name = "PyPI"
+priority = "primary"
+
+[[tool.poetry.source]]
+name = "aliyun"
+priority = "supplemental"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+
+[tool.poetry.group.db-gpt.dependencies]
+dbgpt = { version = "^0.7.0", extras = ["agent", "simple_framework", "framework"] }
+dbgpt-ext = { version = "^0.7.0", extras = ["rag", "graph_rag", "storage_chromadb"] }
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+ruff = "*"
+mypy = "*"
+
+[tool.poetry.group.service.dependencies]
+flask = "3.1.0"
+flask-sqlalchemy = "3.1.1"
+flask-cors = "5.0.0"
+
+[tool.poetry.group.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+pytest-mock = "^3.14.0"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle error
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+    "EXE",
+]
+ignore = [
+    "UP006",    # use List not list
+    "UP035",
+    "UP007",
+]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-sort-within-sections = true
+known-first-party = ["weaver"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+python_files = ["test_*.py"]
+addopts = "-v"
+asyncio_mode = "auto"  # Enable asyncio mode
+markers = [
+    "asyncio: mark test as async"
+]

@@ -1,0 +1,367 @@
+app:
+  name: "Weaver"
+  desc: "运用富有创造力的 LLM Agents 与洞悉万关联的知识图谱，将旅行记忆升华为数字记忆传奇。"
+  version: "0.3.0"
+
+plugin:
+  workflow_platform: "DBGPT"
+
+reasoner:
+  # type: "DUAL"
+  type: "MONO"
+
+tools:
+  - &file_reader_tool
+    name: "FileReader"
+    module_path: "weaver.tool_resource.file_tool"
+
+  - &graph_schema_reader_tool
+    name: "GraphSchemaReader"
+    module_path: "weaver.tool_resource.schema_reader"
+
+  - &graph_importer_tool
+    name: "GraphImporter"
+    module_path: "weaver.tool_resource.graph_importer"
+
+  - &cypher_executor_tool
+    name: "CypherExecutor"
+    module_path: "weaver.tool_resource.cypher_executor"
+
+  - &embedding_retriever_tool
+    name: "EmbeddingRetriever"
+    module_path: "weaver.tool_resource.embedding_retriever"
+
+actions:
+  - &raw_memory_ingestion_action
+    name: "raw_memory_ingestion"
+    desc: "读取用户提供的原始文本记忆材料，一次性读取一/多个文件（节约时间）。"
+    tools:
+      - *file_reader_tool
+
+  - &graph_schema_alignment_action
+    name: "graph_schema_alignment"
+    desc: "查阅现有图数据库Schema。"
+    tools:
+      - *graph_schema_reader_tool
+
+  - &deep_semantic_extraction_action
+    name: "deep_semantic_extraction"
+    desc: "对文本记忆进行深度语义分析，提取ExperientialScene, FocalObservation, AffectiveResonance, InteractionPoint, City, Season, Province 等核心元素，并初步识别它们之间的内在联系和情感氛围。"
+    tools: []
+
+  - &import_graph_data_action
+    name: "import_graph"
+    desc: "（如果有多份文件，就一起分析、导入数据）将解析和结构化的图数据（不包括其 embed 属性）输入到相关的导入工具（推荐 graph_importer_tool，使用 <function_call> 来调用工具）中，持久化数据到Neo4j图数据库中。"
+    tools:
+      - *graph_importer_tool
+      - *cypher_executor_tool
+
+  # --- 维度信息提取 Actions (新增/修改) ---
+  - &scene_activity_query_action
+    name: "scene_activity_query"
+    desc: "基于用户指令中的核心实体（如地点、时间，或者其他可依赖的信息），（允许多条）查询相关的ExperientialScene和InteractionPoint信息。LLM可辅助动态调整查询策略和初步筛选。（可多次调用工具检索）"
+    tools:
+      - *embedding_retriever_tool
+      - *cypher_executor_tool
+
+  - &observation_detail_query_action
+    name: "observation_detail_query"
+    desc: "查询与核心场景关联的FocalObservation信息。LLM可辅助对无明确significance的观察进行初步解读。（可多次调用工具检索）"
+    tools:
+      - *embedding_retriever_tool
+      - *cypher_executor_tool
+
+  - &affective_resonance_query_action
+    name: "affective_resonance_query"
+    desc: "查询与核心场景或观察关联的AffectiveResonance信息。LLM可辅助理解情感触发的上下文。（可多次调用工具检索）"
+    tools:
+      - *embedding_retriever_tool
+      - *cypher_executor_tool
+
+  - &digital_asset_link_query_action
+    name: "digital_asset_link_query"
+    desc: "查询与已识别场景、观察、情感等关联的DigitalAsset的描述信息。（可多次调用工具检索）"
+    tools:
+      - *cypher_executor_tool
+
+  - &narrative_anchor_discovery_action
+    name: "narrative_anchor_discovery"
+    desc: "查询与核心体验片段贡献于的NarrativeAnchor信息，发现潜在的主题线索。（可多次调用工具检索）"
+    tools:
+      - *embedding_retriever_tool
+      - *cypher_executor_tool
+
+  - &creative_story_synthesis_action
+    name: "creative_story_synthesis"
+    desc: "整合从各个维度的结构化记忆片段（文本描述，和旅游相关），编织出一段深刻、个性化且富有情感共鸣的数字记忆故事。故事需体现旅行偏好、情感变化或人生感悟的脉络。"
+    tools: []
+
+toolkit:
+  - [
+      *raw_memory_ingestion_action,
+      *graph_schema_alignment_action,
+      *deep_semantic_extraction_action,
+      *import_graph_data_action,
+    ]
+  - [
+      *scene_activity_query_action,
+      *observation_detail_query_action,
+      *affective_resonance_query_action,
+      *digital_asset_link_query_action,
+      *narrative_anchor_discovery_action,
+      *creative_story_synthesis_action
+    ]
+
+operators:
+  - &memory_integration_and_graphing_operator
+    instruction: |
+      你是一位资深的记忆考古学家和知识图谱构建师。你的核心使命是将用户提供的零散文本记忆（通过文件ID访问）转化为结构化、互联的知识图谱实体，并持久化到Neo4j数据库中。
+      
+      **重要原则：确保所有节点都不是孤立的！每个创建的节点都必须与图谱中的其他节点建立有意义的连接。**
+      
+      具体步骤如下：
+      1. **深度解读与元素提取**：仔细阅读文本，不仅要提取表面的时间、地点、事件，更要深入挖掘构成`ExperientialScene`（完整情境与氛围）、`FocalObservation`（关键观察点）、`AffectiveResonance`（情感与感悟）、`InteractionPoint`（互动行为）、`City`（城市/地点）、`Season`（季节/时间背景）、`Province`（省份）的核心语义单元。将原始文本内容关联为一个`DigitalAsset`节点。
+      
+      2. **结构化与ID赋予**：为每一个提取出的核心语义单元生成一个具有描述性的、由小写字母和下划线组成的短语作为其唯一ID（例如 `kyoto_bamboo_forest_morning`, `spring_cherry_blossom_warm`, `solo_traveler_deep_experience`），并记录其准确或推断的`timestamp`。
+      
+      3. **Schema对齐与映射**：查阅图数据库的Schema（`GraphSchemaReader`），确保你的提取结果能准确映射到预定义的节点类型，并规划它们之间的关系。
+      
+      4. **图谱持久化与强制互联**：生成结构化数据，将这些新节点及其属性和关系存入图数据库。**特别注意以下互联要求**：
+         - **城市节点（City）**：必须通过`BELONGS_TO_PROVINCE`关系连接到对应的省份节点（Province）
+         - **季节节点（Season）**：必须通过`OCCURRED_IN_SEASON`关系与体验场景节点（ExperientialScene）建立连接
+         - **体验场景节点（ExperientialScene）**：必须通过`LOCATED_IN_CITY`关系连接到城市节点，通过`CONSTRUCTED_FROM_ASSET`关系连接到数字资产节点
+         - **焦点观察节点（FocalObservation）**：必须通过`OBSERVED_IN`关系连接到体验场景节点，可通过`IDENTIFIED_IN_ASSET`关系连接到数字资产节点
+         - **情感共鸣节点（AffectiveResonance）**：必须通过`TRIGGERED_BY`关系连接到触发源（ExperientialScene, FocalObservation, 或 InteractionPoint），可通过`EXTRACTED_FROM_ASSET`关系连接到数字资产节点
+         - **互动点节点（InteractionPoint）**：必须通过`OCCURRED_DURING`关系连接到体验场景节点，可通过`DOCUMENTED_BY_ASSET`关系连接到数字资产节点
+         - **数字资产节点（DigitalAsset）**：作为核心连接器，必须与至少一个体验相关节点建立连接
+         
+      **连接性验证**：在创建节点时，确保每个节点都有明确的关系路径连接到图谱的其他部分。如果某个城市或季节节点在当前记忆中首次出现，也要确保它们通过适当的关系与新创建的体验节点建立连接。绝不允许创建孤立的节点！
+      
+      你的目标是克服记忆的孤岛化，构建一个紧密互联的知识网络，为后续的深度探索和叙事打下坚实基础。
+    output_schema: "图谱构建操作的结果将以一段描述性文本形式返回。这段文本会明确指出操作是成功还是失败，并包含一条消息，详细说明操作的具体成果，例如成功创建了哪些主要节点及其各自的唯一ID（如 `kyoto_bamboo_forest_morning`, `mossy_stone_unique_shape`, `spring_cherry_season_warm`, `solo_traveler_seeking_inspiration`），以及建立了哪些关键的节点间关系（特别是城市与省份、场景与季节、场景与城市等核心连接）。此外，文本还会提供与处理的原始文本相对应的DigitalAsset节点的ID，并确认所有创建的节点都已正确连接到图谱网络中，没有孤立节点存在。"
+    actions:
+      - *raw_memory_ingestion_action
+      - *graph_schema_alignment_action
+      - *deep_semantic_extraction_action
+      - *import_graph_data_action
+
+  # --- 维度信息提取 Operators (新增) ---
+  - &scene_activity_retrieval_operator
+    instruction: |
+      你是一位场景与活动分析师。根据用户指令中明确或隐含的核心实体（如“杭州西湖”），你的任务是从图谱中检索相关的`ExperientialScene`和`InteractionPoint`信息。
+      你需要：
+      1. 理解用户意图，确定查询的地理、时间范围。
+      2. 构造Cypher查询，利用文本匹配或`embed`向量（通过`EmbeddingRetriever`）进行地点定位。
+      3. 提取场景名称、描述、时间戳，以及相关的互动描述和结果。
+      4. 对结果进行初步筛选，确保与用户意图高度相关。
+      输出结构化的场景和活动信息（文本描述）。
+    output_schema: |
+      retrieved_scenes_activities:
+        - scene_name: "string"
+          scene_description: "string"
+          timestamp: "DATETIME"
+          interactions:
+            - interaction_description: "string"
+              outcome_summary: "string"
+              timestamp: "DATETIME"
+    actions:
+      - *scene_activity_query_action
+
+  - &observation_detail_retrieval_operator
+    instruction: |
+      你是一位细节观察家。基于已识别的核心场景，你的任务是从图谱中提取所有相关的`FocalObservation`。
+      你需要：
+      1. 针对给定的`ExperientialScene` ID列表，查询其关联的`FocalObservation`。
+      2. 提取观察元素的描述和（如果存在）其重要性。
+      3. 如果`significance`缺失，尝试根据`observed_element`用一句话简要推断其可能的关注点。
+      输出结构化的观察细节信息（文本描述）。
+    output_schema: |
+      retrieved_observations:
+        - observation_name: "string"
+          observed_element: "string"
+          significance: "string" # 可能由LLM补充
+          parent_scene_name: "string"
+    actions:
+      - *observation_detail_query_action
+
+  - &affective_resonance_retrieval_operator
+    instruction: |
+      你是一位情感洞察师。基于已识别的核心场景或观察点，你的任务是从图谱中提取相关的`AffectiveResonance`。
+      你需要：
+      1. 针对给定的`ExperientialScene`或`FocalObservation` ID列表，查询其关联的`AffectiveResonance`。
+      2. 提取情感标签和触发描述。
+      3. 如果用户指令中包含情感倾向，优先检索匹配的情感。可使用`EmbeddingRetriever`进行情感词的语义相似度匹配。
+      输出结构化的情感共鸣信息（文本描述）。
+    output_schema: |
+      retrieved_emotions:
+        - resonance_name: "string"
+          emotion_label: "string"
+          trigger_description: "string"
+          triggered_by_element_name: "string" # Scene, Observation, or Interaction name
+    actions:
+      - *affective_resonance_query_action
+
+  - &digital_asset_context_retrieval_operator
+    instruction: |
+      你是一位数字档案管理员。基于已识别的核心体验片段（场景、观察、情感），你的任务是从图谱中提取关联的`DigitalAsset`的描述性信息。
+      你需要：
+      1. 针对给定的体验片段ID列表，查询其关联的`DigitalAsset`。
+      2. 提取资产的描述和媒体类型（主要关注文本和图像的描述）。
+      输出结构化的数字资产上下文信息（文本描述）。
+    output_schema: |
+      retrieved_asset_contexts:
+        - asset_name: "string"
+          asset_description: "string"
+          media_type: "string"
+          linked_to_element_name: "string" # Scene, Observation, etc.
+        - asset_name: "string"
+          asset_description: "string"
+          media_type: "string"
+          linked_to_element_name: "string" # Scene, Observation, etc.
+        # 可能有多个资产
+        # 注意：这里的`linked_to_element_name`可以是场景、观察、情感等
+        # 也可以是InteractionPoint（如果有的话）
+    actions:
+      - *digital_asset_link_query_action
+
+  - &narrative_anchor_exploration_operator
+    instruction: |
+      你是一位主题模式探险家。基于已识别的核心体验片段，你的任务是从图谱中发掘它们可能贡献于的`NarrativeAnchor`。
+      你需要：
+      1. 针对给定的体验片段ID列表，查询其`CONTRIBUTES_TO`的`NarrativeAnchor`。
+      2. 提取主题摘要和模式描述。
+      3. 可选地，使用`EmbeddingRetriever`基于核心体验片段的`embed`向量，寻找具有相似主题的其他`NarrativeAnchor`或`ExperientialScene`。
+      输出结构化的叙事锚点信息（文本描述）。
+    output_schema: |
+      discovered_narrative_anchors:
+        - anchor_name: "string"
+          theme_summary: "string"
+          pattern_description: "string"
+          contributing_elements_names: ["string"]
+        - other_anchor_name: "string"
+          theme_summary: "string"
+          pattern_description: "string"
+          contributing_elements_names: ["string"]
+        # 可能有多个锚点
+    actions:
+      - *narrative_anchor_discovery_action
+
+  - &creative_synthesis_operator
+    instruction: |
+      你是一位富有创造力的记忆编织大师。你的任务是接收来自多个维度专家提供的关于用户某段经历（如“杭州西湖之行”）的结构化信息片段（包括场景、活动、观察、情感、数字资产描述、叙事锚点等），并将它们融合成一段统一、流畅、生动且富有情感的文本故事。
+      你需要：
+      1. **理解用户原始指令的核心诉求**（例如，是想简单回顾，还是想深入挖掘情感）。
+      2. **整合多源信息**：将所有输入的信息片段看作故事的素材。
+      3. **构建叙事结构**: 组织这些素材，形成有逻辑、有重点的故事线。可以按时间顺序，也可以按情感或主题线索。
+      4. **生动描绘**: 用丰富的语言描绘场景、人物的行动和内心的感受。
+      5. **突出洞察**: 如果`NarrativeAnchor`信息提供了有价值的主题，巧妙地将其融入故事，揭示用户可能的旅行偏好或感悟。
+      6. **情感升华**: 确保故事不仅仅是事实的堆砌，更能传递情感的温度和记忆的深度。
+      你的最终输出是一段完整的、可以直接呈现给用户的文本故事。
+    output_schema: |
+      synthesized_story:
+        title: "string" # 例如："西湖烟雨中的一日漫游"
+        narrative_text: "string" # 完整的、富有文采的故事文本（越长越好，散文形式，自然段偏多）
+        key_insights_highlighted: ["string"] # 夕阳的余晖洒在湖面上，将湖水染成一片金黄色。我坐在塔边的长椅上，静静地欣赏着雷峰夕照，感受着这份宁静和祥和。所有的烦恼和忧愁都仿佛被这美丽的景色所融化，我的心也随之平静下来。"
+    actions:
+      - *creative_story_synthesis_action
+
+experts:
+  - profile:
+      name: "Memory Integration And Graph Expert"
+      desc: |
+        他是一位综合型的专家，负责从用户提供的原始文本记忆中提取深层语义信息，将其结构化为符合预定义图谱Schema的节点和关系，并负责将这些信息准确、完整地持久化到Neo4j知识图谱中。
+        他的工作范围包括：原始文本的深度语义理解、核心记忆元素的提取与结构化、节点ID与时间戳的赋予、与现有图谱Schema的对齐、以及通过Cypher语句进行数据持久化和初步关联。
+        他确保每一份原始记忆都被有效地转化为图谱中的互联知识单元。**他不负责最终的复杂叙事生成。**
+    reasoner:
+      actor_name: "MemoryGraphIntegratorActor"
+      thinker_name: "MemoryGraphIntegratorThinker"
+    workflow:
+      - [*memory_integration_and_graphing_operator]
+
+  # --- 新增的维度专家 ---
+  - profile:
+      name: "Scene And Activity Expert"
+      desc: |
+        他专注于根据用户指令（如特定地点或时间），从记忆图谱中精确检索相关的核心体验场景（ExperientialScene）和互动活动（InteractionPoint）。
+        他能理解用户意图，动态调整查询策略，并输出结构化的场景与活动描述文本。
+    reasoner:
+      actor_name: "SceneActivityRetrieverActor"
+      thinker_name: "SceneActivityRetrieverThinker"
+    workflow:
+      - [*scene_activity_retrieval_operator]
+
+  - profile:
+      name: "Observation Detail Expert"
+      desc: |
+        他擅长挖掘与特定场景关联的细微观察（FocalObservation）。
+        他能提取观察到的元素描述，并对缺乏明确重要性标注的观察进行初步的智能解读，输出结构化的观察细节文本。
+    reasoner:
+      actor_name: "ObservationDetailRetrieverActor"
+      thinker_name: "ObservationDetailRetrieverThinker"
+    workflow:
+      - [*observation_detail_retrieval_operator]
+
+  - profile:
+      name: "Affective Resonance Expert"
+      desc: |
+        他是一位情感分析专家，负责从图谱中提取与特定体验（场景、观察、互动）相关的情感共鸣（AffectiveResonance）。
+        他能识别情感标签、理解触发因素，并可利用语义相似性匹配用户指定的情感，输出结构化的情感信息文本。
+    reasoner:
+      actor_name: "AffectiveResonanceRetrieverActor"
+      thinker_name: "AffectiveResonanceRetrieverThinker"
+    workflow:
+      - [*affective_resonance_retrieval_operator]
+
+  - profile:
+      name: "Digital Asset Context Expert"
+      desc: |
+        他负责管理和检索与核心记忆片段关联的数字资产（DigitalAsset）的上下文描述。
+        他能提取关键的文本描述或图像元信息，为故事创作提供素材，输出结构化的资产上下文文本。
+    reasoner:
+      actor_name: "DigitalAssetContextRetrieverActor"
+      thinker_name: "DigitalAssetContextRetrieverThinker"
+    workflow:
+      - [*digital_asset_context_retrieval_operator]
+
+  - profile:
+      name: "Narrative Anchor Explorer Expert"
+      desc: |
+        他是一位主题探险家，致力于从图谱中发现与用户体验片段相关的叙事锚点（NarrativeAnchor）。
+        他能识别已有的主题贡献，并能利用嵌入向量探索潜在的、相似的主题线索，输出结构化的主题信息文本。
+    reasoner:
+      actor_name: "NarrativeAnchorExplorerActor"
+      thinker_name: "NarrativeAnchorExplorerThinker"
+    workflow:
+      - [*narrative_anchor_exploration_operator]
+
+  - profile:
+      name: "Creative Story Synthesizer Expert"
+      desc: |
+        他是一位顶级的AI故事编织大师，其核心任务是将从各个维度专家处收集到的、关于用户特定经历的结构化文本信息片段，融合成一个统一、生动、富有情感且具有个性化洞察的完整故事。
+        他擅长理解整体意图，构建叙事结构，运用丰富的语言进行描绘，并能巧妙地融入从图谱中发现的主题和模式，最终输出一段高质量的文本记忆传奇。
+        **他不直接查询图谱，其输入完全依赖于其他维度专家提供的文本信息。**
+    reasoner:
+      actor_name: "CreativeStorySynthesizerActor"
+      thinker_name: "CreativeStorySynthesizerThinker"
+    workflow:
+      - [*creative_synthesis_operator] # 单一Operator，纯LLM创作
+
+leader: # Leader负责协调这些并行执行的专家
+  actions: [] # Leader可能需要定义任务分解和专家调度相关的actions
+  # Leader的逻辑会是：
+  # 1. 接收用户指令，例如 "向我讲述，我在杭州西湖的旅游经历。"
+  # 2. 识别核心意图和实体。
+  # 3. 并行地将任务分发给五个维度专家：
+  #    - SceneAndActivityExpert: "查找杭州西湖的场景和活动"
+  #    - ObservationDetailExpert: (依赖SceneExpert的输出) "查找这些场景下的观察细节"
+  #    - AffectiveResonanceExpert: (依赖Scene/ObservationExpert的输出) "查找相关的情感"
+  #    - DigitalAssetContextExpert: (依赖前三者的输出) "查找相关的数字资产描述"
+  #    - NarrativeAnchorExplorerExpert: (依赖前三者的输出) "查找相关的主题锚点"
+  # 4. 收集所有维度专家的输出（结构化文本）。
+  # 5. 将所有收集到的信息传递给 CreativeStorySynthesizerExpert 进行最终的故事创作。
+  # 6. 返回最终的故事给用户。
+  # (注意：上述Leader逻辑在YML中无法直接定义，需要在代码中实现)
+
+knowledgebase: {}
+memory: {}
+env: {}
